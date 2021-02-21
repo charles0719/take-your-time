@@ -5,7 +5,6 @@ import com.charles.domain.FundModel;
 import com.charles.util.DateUtil;
 import com.charles.util.HttpClientUtils;
 import com.charles.util.PoiUtils;
-import com.charles.util.PropertiesUtil;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.commons.io.FileUtils;
@@ -126,18 +125,144 @@ public class AppTest {
         System.out.println(JSONObject.fromObject(res).optJSONObject("data").optJSONObject("fund_position").optJSONArray("stock_list"));
     }
 
+    /**
+     * 获取指定基金的数据
+     *
+     * @throws Exception
+     */
     @Test
     public void t8() throws Exception {
-        //基金排行
+        //爬取网络数据，获取基金排行excel
         //要设置refer http://fund.eastmoney.com/data/fundranking.html
-        String page = "1500";
+        List<FundDto> list = getFundDtos();
+        System.out.println(list.size());
+        Map<String, FundModel> fundModels = getFocusFunds();
+        List<String> codeList = new ArrayList<>();
+        codeList.addAll(fundModels.keySet());
+
+        List<FundDto> fundDtos = list.stream()
+                .filter(s -> codeList.contains(s.getCode()))
+                .collect(Collectors.toList());
+        createFundDatas(fundDtos);
+    }
+
+    /**
+     * 筛选年收益，月收益
+     *
+     * @throws Exception
+     */
+    @Test
+    public void t9() throws Exception {
+        List<FundDto> list = getFundDtos();
+        List<Float> maxDatas = getMaxDatas(list);
+        System.out.println(maxDatas);
+        List<FundDto> res = new ArrayList<>();
+        //医药近6月收益32.3
+        for (FundDto fundDto : list) {
+//            String week = fundDto.getWeek();
+
+            String month = fundDto.getMonth();
+            String threeMonth = fundDto.getThreeMonth();
+            String sixMonth = fundDto.getSixMonth();
+            String year = fundDto.getYear();
+            String twoYear = fundDto.getTwoYear();
+            if (StringUtils.isBlank(month) || StringUtils.isBlank(threeMonth) || StringUtils.isBlank(sixMonth) || StringUtils.isBlank(year) || StringUtils.isBlank(twoYear)) {
+//                System.out.println(fundDto);
+                continue;
+            }
+            if (Float.parseFloat(month) < maxDatas.get(2) / 2) {
+                continue;
+            }
+            if (Float.parseFloat(threeMonth) < maxDatas.get(3) / 2) {
+                continue;
+            }
+            if (Float.parseFloat(sixMonth) < maxDatas.get(4) / 2) {
+                continue;
+            }
+            if (Float.parseFloat(year) < maxDatas.get(5) / 2) {
+                continue;
+            }
+            if (Float.parseFloat(twoYear) < maxDatas.get(6) / 2) {
+                continue;
+            }
+            res.add(fundDto);
+        }
+        System.out.println(res.size());
+        System.out.println(res);
+        createFundDatas(res);
+    }
+
+    @Test
+    public void t10() throws Exception {
+
+    }
+
+    /**
+     * 计算所有基金的最大值，最小值
+     *
+     * @throws Exception
+     */
+    @Test
+    public void t11() throws Exception {
+        List<FundDto> list = getFundDtos();
+        List<Float> maxDatas = getMaxDatas(list);
+        System.out.println(maxDatas);
+    }
+
+    /**
+     * 获取我的基金数据，计算累计收益，计算当天收益,计算持有金额
+     *
+     * @throws Exception
+     */
+    @Test
+    public void t12() throws Exception {
+        List<FundDto> list = getFundDtos();
+        System.out.println(list.size());
+        Map<String, FundModel> fundModels = getMyFunds();
+        List<String> codeList = new ArrayList<>();
+        codeList.addAll(fundModels.keySet());
+
+        List<FundDto> fundDtos = list.stream()
+                .filter(s -> codeList.contains(s.getCode()))
+                .collect(Collectors.toList());
+        //计算累计收益，计算当天收益,计算持有金额
+        float dt = 0;
+        float bt = 0;
+        float mt = 0;
+        for (FundDto fundDto : fundDtos) {
+            FundModel fundModel = fundModels.get(fundDto.getCode());
+            Float count = Float.parseFloat(fundModel.getCount());
+            Float win = Float.parseFloat(fundDto.getVal1()) - Float.parseFloat(fundModel.getVal());
+            Float lastDay = Float.parseFloat(fundDto.getVal1()) / (1 + Float.parseFloat(fundDto.getDay()) / 100);
+            Float dayWin = Float.parseFloat(fundDto.getVal1()) - lastDay;
+            fundModel.setDp(fundDto.getDay());
+            fundModel.setBase(String.valueOf(win * count));
+            fundModel.setDay(String.valueOf(dayWin * count));
+            fundModel.setMoney(String.valueOf(Float.parseFloat(fundDto.getVal1()) * count));
+            dt += Float.parseFloat(fundModel.getDay());
+            bt += Float.parseFloat(fundModel.getBase());
+            mt += Float.parseFloat(fundModel.getMoney());
+        }
+        FundModel total = FundModel.builder().code("xxxxxx").desc("总和").day(dt + "").base(bt + "").money(mt + "").build();
+        fundModels.put("xxxxxx", total);
+        System.out.println(fundModels);
+        createFundprofits(fundModels);
+    }
+
+
+    /**
+     * 基金排行
+     *
+     * @return
+     * @throws Exception
+     */
+    private List<FundDto> getFundDtos() throws Exception {
+        String pageSize = "1500";
         String res = "";
         File file = new File(System.getProperty("user.dir") + String.format("/src/main/resources/%s.txt", DateUtil.formtDate(new Date())));
         if (!file.exists()) {
             file.createNewFile();
-        }
-        if (!PropertiesUtil.getString("update.date").equals(DateUtil.formtDate(new Date()))) {
-            String url = String.format("http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=6yzf&st=desc&sd=2020-02-11&ed=2021-02-11&qdii=&tabSubtype=,,,,,&pi=1&pn=%s&dx=1&v=0.3096005927410441", page);
+            String url = String.format("http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=6yzf&st=desc&sd=2020-02-11&ed=2021-02-11&qdii=&tabSubtype=,,,,,&pi=1&pn=%s&dx=1&v=0.3096005927410441", pageSize);
             res = HttpClientUtils.doGet(url, "", "utf-8");
             FileUtils.writeStringToFile(file, res);
         } else {
@@ -169,43 +294,7 @@ public class AppTest {
                     .build();
             list.add(fundDto);
         }
-        System.out.println(list.size());
-
-        Map<String, FundModel> fundModels = getMyFunds();
-        List<String> codeList = new ArrayList<>();
-        codeList.addAll(fundModels.keySet());
-
-        List<Float> maxDatas = getMaxMinData(list);
-
-        System.out.println(maxDatas);
-        List<FundDto> fundDtos = list.stream()
-                .filter(s -> codeList.contains(s.getCode()))
-                .collect(Collectors.toList());
-        //计算累计收益，计算当天收益
-
-        float dt = 0;
-        float bt = 0;
-        float mt = 0;
-        for (FundDto fundDto : fundDtos) {
-            FundModel fundModel = fundModels.get(fundDto.getCode());
-            Float count = Float.parseFloat(fundModel.getCount());
-            Float win = Float.parseFloat(fundDto.getVal1()) - Float.parseFloat(fundModel.getVal());
-            Float lastDay = Float.parseFloat(fundDto.getVal1()) / (1 + Float.parseFloat(fundDto.getDay()) / 100);
-            Float dayWin = Float.parseFloat(fundDto.getVal1()) - lastDay;
-            fundModel.setDp(fundDto.getDay());
-            fundModel.setBase(String.valueOf(win * count));
-            fundModel.setDay(String.valueOf(dayWin * count));
-            fundModel.setMoney(String.valueOf(Float.parseFloat(fundDto.getVal1()) * count));
-            dt += Float.parseFloat(fundModel.getDay());
-            bt += Float.parseFloat(fundModel.getBase());
-            mt += Float.parseFloat(fundModel.getMoney());
-        }
-        FundModel total = FundModel.builder().code("xxxxxx").desc("总和").day(dt + "").base(bt + "").money(mt + "").build();
-        fundModels.put("xxxxxx", total);
-        System.out.println(fundModels);
-//        createFundDatas(fundDtos);
-        createFundprofits(fundModels);
-
+        return list;
     }
 
     private File createFundprofits(Map<String, FundModel> fundModels) {
@@ -260,7 +349,20 @@ public class AppTest {
         return funds;
     }
 
-    private List<Float> getMaxMinData(List<FundDto> list) {
+    private Map<String, FundModel> getFocusFunds() throws IOException {
+        String path = System.getProperty("user.dir") + "/src/main/resources/focus.txt";
+        System.out.println(path);
+        File file = new File(path);
+        List<String> list = FileUtils.readLines(file, "utf-8");
+        Map<String, FundModel> funds = new TreeMap<>();
+        for (String str : list) {
+            String[] items = str.split(",");
+            funds.put(items[0], FundModel.builder().build());
+        }
+        return funds;
+    }
+
+    private List<Float> getMaxDatas(List<FundDto> list) {
         List<Float> data = new ArrayList<>();
         float max1d = 0;
         float max1w = 0;
@@ -300,11 +402,6 @@ public class AppTest {
         data.add(max1y);
         data.add(max2y);
         return data;
-    }
-
-    @Test
-    public void t9() throws Exception {
-
     }
 
     public File createFundDatas(List<FundDto> records) {
