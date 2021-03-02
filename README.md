@@ -23,8 +23,13 @@ http://blog.yuqiyu.com/springboot-integration-using-flyway.html
 
 https://el-admin.vip/guide/gxdm.html
 
+## easy-excel
 
+https://github.com/alibaba/easyexcel.git
 
-## excel
+快速生成excel文件，代码简洁
 
-https://github.com/Maatwebsite/Laravel-Excel
+## easy-code
+
+idea的插件代码生成
+
