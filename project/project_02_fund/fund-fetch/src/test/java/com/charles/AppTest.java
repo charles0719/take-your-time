@@ -1,18 +1,20 @@
 package com.charles;
 
-import com.charles.domain.FundDto;
-import com.charles.domain.FundModel;
+import com.alibaba.excel.EasyExcel;
+import com.charles.domain.*;
 import com.charles.util.DateUtil;
 import com.charles.util.HttpClientUtils;
 import com.charles.util.PoiUtils;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+import org.apache.commons.collections.list.AbstractListDecorator;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
@@ -26,6 +28,37 @@ import static org.junit.Assert.assertTrue;
  * Unit test for simple App.
  */
 public class AppTest {
+    private Map<String, String> codeMap = new HashMap<>();
+    private Map<String, List<String>> tagMap = new HashMap<>();
+
+    @Before
+    public void b1() throws Exception {
+        String path = System.getProperty("user.dir") + "/src/main/resources/focus.txt";
+        File file = new File(path);
+        List<String> list = FileUtils.readLines(file, "utf-8");
+        for (String item : list) {
+            if (item.startsWith("#")) {
+                continue;
+            }
+            String[] splits = item.split(",");
+            String code = splits[0];
+            String name = splits[1];
+            String tag = splits[2];
+
+            codeMap.put(code, name);
+            if (tagMap.containsKey(tag)) {
+                tagMap.get(tag).add(code);
+            } else {
+                List<String> codes = new ArrayList<>();
+                codes.add(code);
+                tagMap.put(tag, codes);
+            }
+        }
+        System.out.println(codeMap);
+        System.out.println(tagMap);
+
+    }
+
     /**
      * Rigorous Test :-)
      */
@@ -48,7 +81,8 @@ public class AppTest {
 
     @Test
     public void t2() {
-        System.out.println("var rankData = ".length());
+
+
     }
 
     @Test
@@ -81,28 +115,97 @@ public class AppTest {
 
     }
 
+    /**
+     * 归类
+     */
+    @Test
+    public void t4() {
+        List<FundDto> fundList = getFundDtos();
+        List<TinyFundDto> res = new ArrayList<>();
+        for (String tag : tagMap.keySet()) {
+            List<String> codeList = tagMap.get(tag);
+
+            List<FundDto> fundDtos = fundList.stream().filter(s -> codeList.contains(s.getCode())).collect(Collectors.toList());
+            if (tag.equals("其他")) {
+                for (FundDto dto : fundDtos) {
+                    TinyFundDto tinyFundDto = TinyFundDto.builder().tag(dto.getName())
+                            .week(dto.getWeek())
+                            .month(dto.getMonth())
+                            .threemonth(dto.getThreeMonth())
+                            .sixMonth(dto.getSixMonth())
+                            .oneyear(dto.getYear())
+                            .build();
+                    res.add(tinyFundDto);
+                }
+            } else {
+                float week = 0;
+                float month = 0;
+                float threeMonth = 0;
+                float sixMonth = 0;
+                float oneYear = 0;
+                for (FundDto dto : fundDtos) {
+                    week += Float.parseFloat(dto.getWeek());
+                    month += Float.parseFloat(dto.getMonth());
+                    threeMonth += Float.parseFloat(dto.getThreeMonth());
+                    sixMonth += Float.parseFloat(dto.getSixMonth());
+                    oneYear += Float.parseFloat(dto.getYear());
+                }
+                TinyFundDto tinyFundDto = TinyFundDto.builder().tag(tag)
+                        .week(String.valueOf(week / fundDtos.size()))
+                        .month(String.valueOf(month / fundDtos.size()))
+                        .threemonth(String.valueOf(threeMonth / fundDtos.size()))
+                        .sixMonth(String.valueOf(sixMonth / fundDtos.size()))
+                        .oneyear(String.valueOf(oneYear / fundDtos.size()))
+                        .build();
+                res.add(tinyFundDto);
+                System.out.println(tinyFundDto);
+            }
+        }
+        EasyExcel.write("D://fundtag" + System.currentTimeMillis() + ".xlsx", TinyFundDto.class).needHead(true).sheet("标签").doWrite(res);
+    }
+
+    /*
+        周期收益
+     */
     @Test
     public void t5() throws Exception {
         //https://danjuanapp.com/djapi/fund/detail/399011  获取持仓占比
         //https://danjuanapp.com/djapi/fund/derived/399011 获取本基金的所有数据
         //https://danjuanapp.com/djapi/fund/nav/history/161725?size=365&page=1 查看历史净值
-        String url = "https://danjuanapp.com/djapi/fund/nav/history/161725?size=365&page=1";
+//        String[] codes = {"003096", "110011", "000594", "005402", "005968", "570001", "260108", "001691", "005267", "163406", "005827", "001102","121605"};
+        Set<String> codes = codeMap.keySet();
+        List<FundPeriod> funds = new ArrayList<>();
+        for (String code : codes) {
+            float sum1 = getSumPercent(code, "2021-02-18", "2021-02-26");
+            float sum2 = getSumPercent(code, "2021-02-08", "2021-02-10");
+            float sum3 = getSumPercent(code, "2021-02-01", "2021-02-26");
+            System.out.println(code + "," + sum1 + "," + sum2);
+            FundPeriod fundPer = FundPeriod.builder().code(code).sum1(sum1).sum2(sum2).sum3(sum3).name(codeMap.get(code)).build();
+            funds.add(fundPer);
+        }
+        //EasyExcel.write("D://" + System.currentTimeMillis() + ".xlsx", DemoData.class).needHead(true).sheet("hello").doWrite(data());
+        EasyExcel.write("D://fundperiod" + System.currentTimeMillis() + ".xlsx", FundPeriod.class).needHead(true).sheet("收益").doWrite(funds);
+
+    }
+
+    private float getSumPercent(String code, String startDate1, String endDate1) throws Exception {
+        String url = String.format("https://danjuanapp.com/djapi/fund/nav/history/%s?size=365&page=1", code);
         String res = HttpClientUtils.doGet(url, "", "utf-8");
         //计算1.26-1.29的涨幅
-        Date startDate = DateUtil.date("2021-01-25");
-        Date endDate = DateUtil.date("2021-01-30");
+        Date startDate = DateUtil.date(startDate1);
+        Date endDate = DateUtil.date(endDate1);
         JSONArray array = JSONArray.fromObject(JSONObject.fromObject(res).optJSONObject("data").optJSONArray("items"));
-        System.out.println(array);
+//        System.out.println(array);
         float sum = 0;
         for (Object obj : array) {
             JSONObject item = JSONObject.fromObject(obj);
             Date date = DateUtil.date(item.optString("date"));
-            if (date.before(endDate) && date.after(startDate)) {
+            if (!date.after(endDate) && !date.before(startDate)) {
                 sum += Float.parseFloat(item.getString("percentage"));
-                System.out.println(item.optString("date") + "," + item.getString("percentage"));
+//                System.out.println(item.optString("date") + "," + item.getString("percentage"));
             }
         }
-        System.out.println(sum);
+        return sum;
     }
 
     @Test
@@ -141,7 +244,7 @@ public class AppTest {
         codeList.addAll(fundModels.keySet());
 
         List<FundDto> fundDtos = list.stream()
-                .filter(s -> codeList.contains(s.getCode()))
+                .filter(s -> codeList.contains(s.getCode())).sorted(Comparator.comparing(FundDto::getMonth))
                 .collect(Collectors.toList());
         createFundDatas(fundDtos);
     }
@@ -194,7 +297,30 @@ public class AppTest {
 
     @Test
     public void t10() throws Exception {
+        List<FundDto> list = getFundDtos();
+        System.out.println(list.size());
 
+        List<AvgFundDto> avgList= new ArrayList<>();
+        for(FundDto dto:list){
+            if(!codeMap.containsKey(dto.getCode())){
+                continue;
+            }
+            if (StringUtils.isBlank(dto.getYear())) {
+                continue;
+            }
+            AvgFundDto avg = AvgFundDto.builder()
+                    .code(dto.getCode())
+                    .name(dto.getName())
+                    //String.format("%.2f", d);
+                    .week(String.format("%.2f",Float.parseFloat(dto.getWeek())/7*100))
+                    .month(String.format("%.2f",Float.parseFloat(dto.getMonth())/30*100))
+                    .threemonth(String.format("%.2f",Float.parseFloat(dto.getThreeMonth())/90*100))
+                    .sixMonth(String.format("%.2f",Float.parseFloat(dto.getSixMonth())/180*100))
+                    .oneyear(String.format("%.2f",Float.parseFloat(dto.getYear())/365*100))
+                    .build();
+            avgList.add(avg);
+        }
+        EasyExcel.write("D://fund_dayavg" + System.currentTimeMillis() + ".xlsx", AvgFundDto.class).needHead(true).sheet("收益").doWrite(avgList);
     }
 
     /**
@@ -256,17 +382,21 @@ public class AppTest {
      * @return
      * @throws Exception
      */
-    private List<FundDto> getFundDtos() throws Exception {
-        String pageSize = "1500";
+    private List<FundDto> getFundDtos() {
+        String pageSize = "5000";
         String res = "";
-        File file = new File(System.getProperty("user.dir") + String.format("/src/main/resources/%s.txt", DateUtil.formtDate(new Date())));
-        if (!file.exists()) {
-            file.createNewFile();
-            String url = String.format("http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=6yzf&st=desc&sd=2020-02-11&ed=2021-02-11&qdii=&tabSubtype=,,,,,&pi=1&pn=%s&dx=1&v=0.3096005927410441", pageSize);
-            res = HttpClientUtils.doGet(url, "", "utf-8");
-            FileUtils.writeStringToFile(file, res);
-        } else {
-            res = FileUtils.readFileToString(file);
+        try {
+            File file = new File(System.getProperty("user.dir") + String.format("/src/main/resources/%s.txt", DateUtil.formtDate(new Date())));
+            if (!file.exists()) {
+                file.createNewFile();
+                String url = String.format("http://fund.eastmoney.com/data/rankhandler.aspx?op=ph&dt=kf&ft=all&rs=&gs=0&sc=6yzf&st=desc&sd=2020-02-11&ed=2021-02-11&qdii=&tabSubtype=,,,,,&pi=1&pn=%s&dx=1&v=0.3096005927410441", pageSize);
+                res = HttpClientUtils.doGet(url, "", "utf-8");
+                FileUtils.writeStringToFile(file, res);
+            } else {
+                res = FileUtils.readFileToString(file);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         res = res.substring(15, res.length() - 1);
@@ -349,11 +479,16 @@ public class AppTest {
         return funds;
     }
 
-    private Map<String, FundModel> getFocusFunds() throws IOException {
+    private Map<String, FundModel> getFocusFunds() {
         String path = System.getProperty("user.dir") + "/src/main/resources/focus.txt";
         System.out.println(path);
         File file = new File(path);
-        List<String> list = FileUtils.readLines(file, "utf-8");
+        List<String> list = null;
+        try {
+            list = FileUtils.readLines(file, "utf-8");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         Map<String, FundModel> funds = new TreeMap<>();
         for (String str : list) {
             String[] items = str.split(",");
