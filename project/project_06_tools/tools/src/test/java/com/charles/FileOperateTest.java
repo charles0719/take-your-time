@@ -22,7 +22,7 @@ public class FileOperateTest {
         // 拆分后的目录
         File splitDir = new File("D:\\update\\output");
 
-//        splitFile(resFile, splitDir);
+        splitFile(resFile, splitDir);
 
         mergeFile(splitDir);
     }

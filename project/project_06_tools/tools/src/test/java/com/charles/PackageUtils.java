@@ -2,6 +2,7 @@ package com.charles;
 
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,22 +20,24 @@ public class PackageUtils {
      */
     public static void main(String[] args) {
 //        String srcPath = "D:\\BusinessCode\\kbaseui-dev\\target\\kbaseui-dev";
-        String srcPath = "D:\\BusinessCode\\kbase-core\\out\\artifacts\\kbase_workflow";
+        String srcPath = "D:\\BusinessCode\\kbase-core\\target\\kbase-core";
 
-        String trgPath = "D:\\update\\oppo_0315\\kbase_workflow";
+        String trgPath = "D:\\update\\oppo3_0316\\kbase-core";
         exportFiles(srcPath, trgPath);
         /*
         src/com/startling/base/job/WorkInfoSyncJob.java
         src/com/startling/webservice/StartlingServiceImpl.java
         src/config/applicationContext-quratz.xml
         src/sync/manager/key.properties
+
+        src/main/java/com/eastrobot/module/enums/RelationKeyEnum.java
          */
     }
 
-    private static void exportFiles(String srcPath, String trgPath) {
+    public static void exportFiles(String srcPath, String trgPath) {
         try {
             //获取需要更新的文件名
-            Set<String> fileNames = getFileNames();
+            Set<String> fileNames = getFileNames1();
             System.out.println(fileNames);
             //获取目标目录下的所有文件
 
@@ -56,10 +59,10 @@ public class PackageUtils {
                         resFiles.add(file);
                         //内部类处理
                     } else {
-                        String regex = name_ + "\\$[^\\d]+\\.class";
-
+                        String regex = item.substring(item.lastIndexOf("\\") + 1).replace(".class", "") + "\\$[^\\.]+\\.class";
                         Pattern pattern = Pattern.compile(regex);
-                        Matcher matcher = pattern.matcher(item);
+                        //RelationKeyEnum$1.class
+                        Matcher matcher = pattern.matcher(name);
 //                        RegexpMatcher matcher = RegexpUtils.getMatcher(regex);
                         if (matcher.matches()) {
                             resFiles.add(file);
@@ -88,12 +91,28 @@ public class PackageUtils {
         return arrs;
     }
 
+    public static Set<String> getFileNames1() {
+        Set<String> set = new HashSet<>();
+        try {
+            List<String> list = FileUtils.readLines(new File(System.getProperty("user.dir") + "/src/main/resources/update.txt"));
+            for (String str : list) {
+                if (StringUtils.isNotBlank(str)) {
+                    set.add(dealWithStr(str));
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return set;
+    }
+
     public static String dealWithStr(String str) {
         str = str.replaceAll("src/main/java/", "");
         str = str.replaceAll("src/main/webapp/", "");
         str = str.replaceAll("src/main/resources/", "");
         //workflow专属
         str = str.replaceAll("src/", "");
+        str = str.replaceAll("webapp/", "");
         str = str.replace("/", "\\");
         str = str.replaceAll(".java", ".class");
         return str;

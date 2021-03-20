@@ -39,3 +39,9 @@ done
 echo $sum
 ```
 
+# 删除0kb的文件
+
+```sh
+find . -name "*" -type f -size 0c | xargs -n 1 rm -f
+```
+

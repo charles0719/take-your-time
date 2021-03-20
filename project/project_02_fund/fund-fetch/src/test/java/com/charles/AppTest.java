@@ -15,6 +15,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.Before;
 import org.junit.Test;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -56,7 +57,7 @@ public class AppTest {
     }
 
     @Test
-    public void t1() throws Exception {
+    public void t1() {
         //爬取网络数据，获取基金排行excel
         //要设置refer http://fund.eastmoney.com/data/fundranking.html
         List<FundDto> list = getFundDtos();
@@ -284,9 +285,9 @@ public class AppTest {
         List<FundDto> list = getFundDtos();
         System.out.println(list.size());
 
-        List<AvgFundDto> avgList= new ArrayList<>();
-        for(FundDto dto:list){
-            if(!codeMap.containsKey(dto.getCode())){
+        List<AvgFundDto> avgList = new ArrayList<>();
+        for (FundDto dto : list) {
+            if (!codeMap.containsKey(dto.getCode())) {
                 continue;
             }
             if (StringUtils.isBlank(dto.getYear())) {
@@ -296,11 +297,11 @@ public class AppTest {
                     .code(dto.getCode())
                     .name(dto.getName())
                     //String.format("%.2f", d);
-                    .week(String.format("%.2f",Float.parseFloat(dto.getWeek())/7*100))
-                    .month(String.format("%.2f",Float.parseFloat(dto.getMonth())/30*100))
-                    .threemonth(String.format("%.2f",Float.parseFloat(dto.getThreeMonth())/90*100))
-                    .sixMonth(String.format("%.2f",Float.parseFloat(dto.getSixMonth())/180*100))
-                    .oneyear(String.format("%.2f",Float.parseFloat(dto.getYear())/365*100))
+                    .week(String.format("%.2f", Float.parseFloat(dto.getWeek()) / 7 * 100))
+                    .month(String.format("%.2f", Float.parseFloat(dto.getMonth()) / 30 * 100))
+                    .threemonth(String.format("%.2f", Float.parseFloat(dto.getThreeMonth()) / 90 * 100))
+                    .sixMonth(String.format("%.2f", Float.parseFloat(dto.getSixMonth()) / 180 * 100))
+                    .oneyear(String.format("%.2f", Float.parseFloat(dto.getYear()) / 365 * 100))
                     .build();
             avgList.add(avg);
         }
@@ -542,7 +543,7 @@ public class AppTest {
     }
 
     @Test
-    public void t20() {
+    public void t20() throws Exception {
         //http://fund.eastmoney.com/trade/pg.html
         //开放基金排行
         String type = "hh";//hh 混合；pg 偏股；gp 股票；zs 指数；qdii
