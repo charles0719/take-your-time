@@ -15,7 +15,6 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.Before;
 import org.junit.Test;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -30,7 +29,7 @@ public class AppTest {
 
     @Before
     public void b1() throws Exception {
-        String path = System.getProperty("user.dir") + "/src/main/resources/focus.txt";
+        String path = System.getProperty("user.dir") + "/src/main/resources/zixuan.txt";
         File file = new File(path);
         List<String> list = FileUtils.readLines(file, "utf-8");
         for (String item : list) {
@@ -425,7 +424,7 @@ public class AppTest {
     }
 
     private Map<String, FundModel> getFocusFunds() {
-        String path = System.getProperty("user.dir") + "/src/main/resources/focus.txt";
+        String path = System.getProperty("user.dir") + "/src/main/resources/zixuan.txt";
         System.out.println(path);
         File file = new File(path);
         List<String> list = null;

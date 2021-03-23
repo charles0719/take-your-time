@@ -4,7 +4,6 @@ import com.charles.domain.FundModel;
 import com.charles.util.PropertiesUtil;
 import org.apache.commons.io.FileUtils;
 import org.junit.Test;
-
 import java.io.File;
 import java.util.List;
 

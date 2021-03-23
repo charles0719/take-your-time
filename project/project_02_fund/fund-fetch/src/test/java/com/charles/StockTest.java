@@ -1,12 +1,14 @@
 package com.charles;
 
+import com.charles.domain.Account;
 import com.charles.domain.HistoryModel;
 import com.charles.util.HttpClientUtils;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import net.sf.json.JSONArray;
 import org.junit.Test;
-
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -14,12 +16,6 @@ import java.util.List;
  * @date 2021/3/21 14:57
  */
 public class StockTest {
-
-    @Test
-    public void t20() throws Exception {
-        double initial = 1.20;
-        System.out.println(initial * (1 + 5 / 100d));
-    }
 
     @Test
     public void t6() throws Exception {
@@ -47,5 +43,92 @@ public class StockTest {
         System.out.println(result);
     }
 
+    @Test
+    public void t20() throws Exception {
+        double initial = 1.20;
+        double count = 1000;
+        System.out.println(initial * (1 + 5 / 100d));
+        double value = 1.26d;
+        if ((initial - value) / initial * 100 > 10) {
+            count = count + 1000;
+        } else if ((value - initial) / initial * 100 > 10) {
+            count = count / 2;
+        }
+    }
 
+    @Test
+    public void t21() {
+        //简单的马丁格尔策略1： 升值的趋势一直保持，就加仓，一旦回调，立马减去一半
+        double[] data = {1.28, 1.26, 1.24, 1.22, 1.20, 1.22, 1.24};
+        double start = data[0];
+        int count = 1000;
+        double bValue = start * count;//买入金钱
+        double tValue = 100000;//剩余金钱
+        for (int i = 1; i < data.length; i++) {
+            //如果买入持仓不动，收益变化
+            bValue = bValue + (data[i] - start) * count;
+            start = data[i];
+        }
+        System.out.println(bValue);
+    }
+
+    @Test
+    public void t22() {
+        //简单的马丁格尔策略1： 升值的趋势一直保持，就加仓，一旦回调，立马减去一半
+        double[] data = {1.20, 1.22, 1.24, 1.26, 1.28, 1.26, 1.24};
+        double start = data[0];
+        int count = 1000;
+        double bValue = start * count;//买入金钱
+        double tValue = 100000 - bValue;//剩余金钱
+        double profit = 0d;
+        Account account1 = Account.builder().flowAccount(bValue).profit(0d).count(count).build();
+        List<Account> accounts = new ArrayList<>();
+        accounts.add(account1);
+        for (int i = 1; i < data.length; i++) {
+            bValue = bValue + (data[i] - start) * count;
+            profit += (data[i] - start) * count;
+            if (data[i] > start) {
+                bValue += 1000 * data[i];
+                tValue -= 1000 * data[i];
+                count += 1000;
+            } else {
+                count /= 2;
+                bValue -= data[i] * count;
+                tValue += data[i] * count;
+            }
+            Account account = Account.builder().flowAccount(bValue).profit(profit).count(count).build();
+            accounts.add(account);
+            start = data[i];
+        }
+        System.out.println(JSONArray.fromObject(accounts));
+    }
+
+    @Test
+    public void t23() {
+        //简单的马丁格尔策略2： 波动下行的趋势保持，就加仓，一旦回调，等收益持平，保证仓位不动，只需要1.24的时候就可以把收益稳住。
+        double[] data = {1.28, 1.26, 1.24, 1.22, 1.20, 1.22, 1.24};
+        double start = data[0];
+        int count = 1000;
+        double bValue = start * count;//买入金钱
+        double profit = 0;
+        Account account1 = Account.builder().flowAccount(bValue).profit(0d).count(count).build();
+        List<Account> accounts = new ArrayList<>();
+        accounts.add(account1);
+        for (int i = 1; i < data.length; i++) {
+            //如果买入持仓不动，收益变化
+            bValue = bValue + (data[i] - start) * count;
+            profit += (data[i] - start) * count;
+            if (data[i] < start) {
+                bValue += 1000 * data[i];
+                count += 1000;
+            } else {
+//                count /= 2;
+//                bValue -= data[i] * count;
+            }
+            Account account = Account.builder().flowAccount(bValue).profit(profit).count(count).build();
+            accounts.add(account);
+            start = data[i];
+        }
+        System.out.println(JSONArray.fromObject(accounts));
+    }
 }

@@ -16,6 +16,7 @@ public class PkgTest {
 
     @Test
     public void t1() {
+        //git show a451957 --name-only
 //        String srcPath = "D:\\BusinessCode\\kbase-report\\target\\kbase-report";
         String srcPath = "D:\\BusinessCode\\kbase-core\\target\\kbase-core";
 //        String srcPath = "D:\\BusinessCode\\kbase-core\\out\\artifacts\\kbase_workflow";

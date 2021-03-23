@@ -1,20 +1,17 @@
 package com.charles;
 
 import com.alibaba.excel.EasyExcel;
-import com.charles.domain.AvgFundDto;
 import com.charles.domain.HistoryDto;
-import com.charles.domain.HistoryModel;
+import com.charles.mapping.FieldMethod;
+import com.charles.mapping.Mapping;
+import com.charles.mapping.MappingField;
 import com.charles.util.HttpClientUtils;
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import org.apache.commons.lang.StringUtils;
 import org.junit.Test;
-
+import java.lang.reflect.Method;
 import java.util.*;
-
-import static jdk.nashorn.internal.objects.Global.print;
 
 /**
  * @author charles
@@ -53,33 +50,69 @@ public class DanJuanTest {
 //            System.out.println(obj.getString("fd_code") + "," + obj.getString("fd_name"));
             map.put(obj.getString("fd_code"), obj.getString("fd_name"));
         }
-
     }
 
     @Test
     public void t3() throws Exception {
-        String url2 = "https://danjuanapp.com/djapi/fund/nav/history/%s?page=1&size=180";
-        String[] keys = "110011,005445,008099,005937,570001,166005,166019,163406,005267,260108".split(",");
-        for (String key : keys) {
+        String url2 = "https://danjuanapp.com/djapi/fund/nav/history/%s?page=1&size=90";
+//        String[] keys = "110011,005445,008099,005937,570001,166005,166019,163406,005267,260108".split(",");
+        Map<String, Method> annoMethods = Mapping.getAnnoMethods(HistoryDto.class);
+        //以日期为单位
+        Map<String, HistoryDto> historyDtoMap = new LinkedHashMap<>();
+        for (String key : annoMethods.keySet()) {
+            Method method = annoMethods.get(key);
             String url = String.format(url2, key);
             String historyData = HttpClientUtils.doGet(url, "", "utf-8");
             JSONArray historyArray = JSONObject.fromObject(historyData).getJSONObject("data").getJSONArray("items");
-            Map<String, Double> dataMap = new LinkedHashMap<>();
             double data = 0d;
-            List<HistoryDto> historys = new ArrayList<>();
             for (int i = historyArray.size() - 1; i >= 0; i--) {
                 JSONObject item = historyArray.getJSONObject(i);
+                String date = item.getString("date");
                 data += item.optDouble("percentage");
-                dataMap.put(item.getString("date"), data);
-                HistoryDto model = HistoryDto.builder().day(item.getString("date")).code1(String.format("%.2f", data)).build();
-                historys.add(model);
+                HistoryDto model;
+                if (historyDtoMap.containsKey(date)) {
+                    model = historyDtoMap.get(date);
+                } else {
+                    model = HistoryDto.builder().day(date).build();
+                    historyDtoMap.put(date, model);
+                }
+                method.invoke(model, String.format("%.2f", data));
             }
-            EasyExcel.write("D://history_" + key + ".xlsx", HistoryModel.class).needHead(true).sheet("收益").doWrite(historys);
-
-//            System.out.println(dataMap);
         }
+        List<HistoryDto> arr = new ArrayList<>();
+        arr.addAll(historyDtoMap.values());
+        EasyExcel.write("D://history_" + UUID.randomUUID().toString().substring(0, 6) + ".xlsx", HistoryDto.class).needHead(true).sheet("收益").doWrite(arr);
+    }
 
+    @Test
+    public void t4() throws Exception {
+//        HistoryDto model = HistoryDto.builder().day("2021-03-23").code1(String.format("%.2f", 21)).build();
+        List<FieldMethod> fieldMethods = Mapping.getFieldMethods(HistoryDto.class);
+        HistoryDto historyDto = HistoryDto.builder().build();
+        for (FieldMethod fieldMethod : fieldMethods) {
+            System.out.println(fieldMethod.getField().getName());
+            MappingField annotation = fieldMethod.getField().getAnnotation(MappingField.class);
+            if (annotation != null) {
+                System.out.println(annotation.code() + "," + annotation.name());
+                fieldMethod.getMethod().invoke(historyDto, annotation.code());
+            }
+        }
+        System.out.println(historyDto);
+    }
 
+    @Test
+    public void t5() throws Exception {
+        Map<String, Method> annoMethods = Mapping.getAnnoMethods(HistoryDto.class);
+        String key = "110011";
+        Method method = annoMethods.get(key);
+        HistoryDto historyDto = HistoryDto.builder().build();
+        method.invoke(historyDto, "123");
+        System.out.println(historyDto);
+    }
+
+    @Test
+    public void t6() {
+        //如何根据focus.txt生成java文件
     }
 
 
